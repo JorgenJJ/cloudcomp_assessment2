@@ -1,0 +1,32 @@
+extends layout
+
+block content
+  body
+    #controls
+      span
+        label
+          input#combine(type='radio', name='grouping', value='combine', checked='')
+          | Combine
+        label
+          input#continents(type='radio', name='grouping', value='continents')
+          | Continents
+        label
+          input#country-centers(type='radio', name='grouping', value='country-centers')
+          | Country Centers
+        label
+          input#population(type='radio', name='grouping', value='population')
+          | Population
+      span
+        label
+          input#colors(type='radio', name='fill', value='colors', checked='')
+          | Colors
+        label
+          input#flags(type='radio', name='fill', value='flags')
+          | Flags
+    #country-info
+    #bubble-chart
+    script.
+      d3.queue()
+      .defer(d3.csv, "countries.csv")
+      .defer(d3.json, "continent-names.json")
+      .await(createBubbleChart);
