@@ -6,6 +6,7 @@ const width = 600,
       height = 400;
 
 let diameter = 300;
+let relevancyTotal = 0;
 
 // let svg = { min: 10, max: 80 },
 //       circles = { min: 10, max: 80 },
@@ -26,131 +27,85 @@ let svg = d3.select("#bubble-chart")
     .attr("height", height)
     .attr("class", "bubble");
 
-// let nodes = d3.hierarchy(root)
-//     .sum(function(d) { return d.size; });
+function updateBubbles(root) {
+  if (root.children.length > 1) {
+    for(let i = 0; i < root.children.length; i++) {
+      console.log(root.children[i].size);
+      console.log(root.children[i].relevancy);
+      root.children[i].size = Math.floor(((relevancyTotal - root.children[i].relevancy) / relevancyTotal) * 100);
+    }
+  }
 
-var node = svg.selectAll(".node")
-    .data(bubble.nodes(classes(root))
-    .filter(function (d) {
-    return !d.children;
-}))
-    .enter().append("g")
+  var node = svg.selectAll(".node")
+    .data(
+      bubble.nodes(classes(root)).filter(function (d){return !d.children;}),
+      function(d) {return d.className} // key data based on className to keep object constancy
+  );
+
+  // capture the enter selection
+  var nodeEnter = node.enter()
+    .append("g")
     .attr("class", "node")
     .attr("transform", function (d) {
-    return "translate(" + d.x + "," + d.y + ")";
-});
-
-node.append("title")
-    .text(function (d) {
-    return d.className + ": " + format(d.value);
-});
-
-node.append("circle")
-    .attr("r", function (d) {
-    return d.r;
-})
-    .style("fill", function (d, i) {
-    return color(i);
-});
-
-node.append("text")
-  .attr("dy", ".3px")
-  .style("text-anchor", "middle")
-  .text(function(d) {
-    return d.className;
+      return "translate(" + d.x + "," + d.y + ")";
   });
 
-function classes(root) {
+  // re-use enter selection for circles
+  nodeEnter
+    .append("circle")
+    .attr("r", function (d) {return d.r;})
+    .style("fill", function (d, i) {return color(i);})
+
+  // re-use enter selection for titles
+  nodeEnter
+    .append("title")
+    .text(function (d) {
+      return d.className + ": " + d.value;
+  });
+
+  node.select("circle")
+    .transition().duration(1000)
+    .attr("r", function (d) {
+      return d.r;
+  })
+    .style("fill", function (d, i) {
+      return color(i);
+  });
+
+  node.append("text")
+    .attr("dy", ".3px")
+    .style("text-anchor", "middle")
+    .text(function(d) {
+      return d.className;
+  });
+
+  node.transition().attr("class", "node")
+    .attr("transform", function (d) {
+    return "translate(" + d.x + "," + d.y + ")";
+  });
+
+  node.exit().remove();
+
+  // Returns a flattened hierarchy containing all leaf nodes under the root.
+  function classes(root) {
     var classes = [];
 
     function recurse(name, node) {
-        if (node.children) node.children.forEach(function (child) {
-            recurse(node.name, child);
-        });
-        else classes.push({
-            packageName: name,
-            className: node.name,
-            value: node.size
-        });
+      if (node.children) node.children.forEach(function (child) {
+          recurse(node.name, child);
+      });
+      else classes.push({
+          packageName: name,
+          className: node.name,
+          value: node.size
+      });
     }
 
     recurse(null, root);
     return {
-        children: classes
+      children: classes
     };
-}
-
-function updateBubbles(root) {
-    var node = svg.selectAll(".node")
-        .data(
-            bubble.nodes(classes(root)).filter(function (d){return !d.children;}),
-            function(d) {return d.className} // key data based on className to keep object constancy
-        );
-
-    // capture the enter selection
-    var nodeEnter = node.enter()
-        .append("g")
-        .attr("class", "node")
-        .attr("transform", function (d) {
-            return "translate(" + d.x + "," + d.y + ")";
-        });
-
-    // re-use enter selection for circles
-    nodeEnter
-        .append("circle")
-        .attr("r", function (d) {return d.r;})
-        .style("fill", function (d, i) {return color(i);})
-
-    // re-use enter selection for titles
-    nodeEnter
-        .append("title")
-        .text(function (d) {
-            return d.className + ": " + format(d.value);
-        });
-
-    node.select("circle")
-        .transition().duration(1000)
-        .attr("r", function (d) {
-            return d.r;
-        })
-        .style("fill", function (d, i) {
-            return color(i);
-        });
-
-    node.append("text")
-      .attr("dy", ".3px")
-      .style("text-anchor", "middle")
-      .text(function(d) {
-        return d.className;
-      });
-
-    node.transition().attr("class", "node")
-        .attr("transform", function (d) {
-        return "translate(" + d.x + "," + d.y + ")";
-    });
-
-    node.exit().remove();
-
-    // Returns a flattened hierarchy containing all leaf nodes under the root.
-    function classes(root) {
-        var classes = [];
-
-        function recurse(name, node) {
-            if (node.children) node.children.forEach(function (child) {
-                recurse(node.name, child);
-            });
-            else classes.push({
-                packageName: name,
-                className: node.name,
-                value: node.size
-            });
-        }
-
-        recurse(null, root);
-        return {
-            children: classes
-        };
-    }
+  }
 
     //d3.select(self.frameElement).style("height", diameter + "px");
 }
@@ -169,8 +124,8 @@ function createCircle() {
   updateBubbles(root);
 }
 
-function createCircle(name, size) {
-  root.children.push({"name": name, "size": Number(size), "growth": 0});
+function createCircle(name, size, relevancy) {
+  root.children.push({"name": name, "size": Number(size), "growth": 0, "relevancy": Number(relevancy) });
   updateBubbles(root);
 }
 
@@ -182,7 +137,8 @@ function sendRequest() {
   }).done(function(res) {
     if (res.success) {
         console.log("AJAX: SUCCESS");
-        createCircle(res.data.query, res.data.length);
+        relevancyTotal += res.data.relevancy.total;
+        createCircle(res.data.query, 1, res.data.relevancy.keyword);
     }
     else {
         console.log("AJAX: ERROR");
