@@ -1,5 +1,4 @@
-let root = {"children": [{"name": "flare", "size": 10, "growth": 2},
-            {"name": "test", "size": 15, "growth": 1}]};
+let root = {"children": []};
 let index = 0,
     format = d3.format(",d");
 
@@ -170,11 +169,32 @@ function createCircle() {
   updateBubbles(root);
 }
 
-let counter;
-counter = setInterval(function() {
-  let length = root.children.length;
-  for (let i = 0; i < length; i++) {
-    root.children[i].size += root.children[i].growth;
-  }
+function createCircle(name, size) {
+  root.children.push({"name": name, "size": Number(size), "growth": 0});
   updateBubbles(root);
-}, 100);
+}
+
+function sendRequest() {
+  $.ajax({
+    url: '/api/twitter',
+    method: 'post',
+    data: { query: document.getElementById("inp_search").value }
+  }).done(function(res) {
+    if (res.success) {
+        console.log("AJAX: SUCCESS");
+        createCircle(res.data.query, res.data.length);
+    }
+    else {
+        console.log("AJAX: ERROR");
+      }
+  });
+}
+
+// let counter;
+// counter = setInterval(function() {
+//   let length = root.children.length;
+//   for (let i = 0; i < length; i++) {
+//     root.children[i].size += root.children[i].growth;
+//   }
+//   updateBubbles(root);
+// }, 100);

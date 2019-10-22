@@ -3,11 +3,16 @@ extends layout
 block content
   body
     #controls
-    input(type="text", id="inp_name" placeholder="Bubble name")
-    input(type="number", id="inp_number", value="10")
-    input(type="number", id="inp_growth", value="1")
-    input(type="button", value="Add bubble", onclick="createCircle()")
+      #cont_chart
+        input(type="text", id="inp_name" placeholder="Bubble name")
+        input(type="number", id="inp_number", value="10")
+        input(type="number", id="inp_growth", value="1")
+        input(type="submit", value="Add bubble", onclick="createCircle()")
+      #cont_twitter
+        input(type="text", id="inp_search", name="search_field", placeholder="Search for phrase or word")
+        input(type="button", value="Search", onclick="sendRequest()")
     #bubble-chart
+    
     script(src='/javascripts/index.js')
     //- script.
     //-   d3.queue()
