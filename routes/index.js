@@ -36,7 +36,6 @@ var twitter = new Twitter({
 });
 
 let scoreTotal = 0;
-let relevancyTotal = 0;
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -120,11 +119,7 @@ router.post("/api/twitter", function(req, res, next) {
 
             let d1 = new Date(tweetArray[0].date);
             let d2 = new Date(tweetArray[tweetArray.length - 1].date);
-            let relevancyKeyword = Math.abs(d1 - d2);
-            relevancyTotal += relevancyKeyword;
-            console.log(relevancyTotal);
-            console.log(relevancyKeyword);
-            console.log(Math.floor((relevancyKeyword / relevancyTotal) * 100));
+            let relevancy = 1 / (Math.abs(d1 - d2));
 
             tweets.statuses.forEach(function(tweet) {
              //redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweet: tweet.id_str, tweet: tweet.user.screen_name, tweet: tweet.user.name, tweet: tweet.text}));
@@ -149,11 +144,11 @@ router.post("/api/twitter", function(req, res, next) {
 
             });
 
-            redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweetArray, score: scoreTotal, relevancy: {keyword: relevancyKeyword, total: relevancyTotal }}));
+            redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweetArray, score: scoreTotal, relevancy: relevancy}));
 
             // store in S3
             //const responseJSON = response.data;
-            const body = JSON.stringify({source: 'S3 Bucket', tweetArray, score: scoreTotal, relevancy: {keyword: relevancyKeyword, total: relevancyTotal }});
+            const body = JSON.stringify({source: 'S3 Bucket', tweetArray, score: scoreTotal, relevancy: relevancy});
             const objectParams = {
               Bucket: bucketName,
               Key: s3Key,
@@ -168,7 +163,7 @@ router.post("/api/twitter", function(req, res, next) {
             });
 
             s = s + 'Score Total: ' + scoreTotal;
-            res.json({ success: true, data: {query: input, length: tweetArray.length, score: scoreTotal, relevancy: {keyword: relevancyKeyword, total: relevancyTotal } } });
+            res.json({ success: true, data: {query: input, length: tweetArray.length, score: scoreTotal, relevancy: relevancy } });
           });
         }
       });

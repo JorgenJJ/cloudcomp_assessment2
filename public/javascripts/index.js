@@ -30,9 +30,11 @@ let svg = d3.select("#bubble-chart")
 function updateBubbles(root) {
   if (root.children.length > 1) {
     for(let i = 0; i < root.children.length; i++) {
-      console.log(root.children[i].size);
-      console.log(root.children[i].relevancy);
-      root.children[i].size = Math.floor(((relevancyTotal - root.children[i].relevancy) / relevancyTotal) * 100);
+      root.children[i].size = Math.floor(((root.children[i].relevancy) / relevancyTotal) * 100);
+
+      console.log(root.children[i].name + ": " + Math.floor(((root.children[i].relevancy) / relevancyTotal) * 100) + "%");
+
+
     }
   }
 
@@ -78,6 +80,8 @@ function updateBubbles(root) {
     .text(function(d) {
       return d.className;
   });
+
+  console.log(node);
 
   node.transition().attr("class", "node")
     .attr("transform", function (d) {
@@ -126,6 +130,7 @@ function createCircle() {
 
 function createCircle(name, size, relevancy) {
   root.children.push({"name": name, "size": Number(size), "growth": 0, "relevancy": Number(relevancy) });
+  document.getElementById("inp_search").value = "";
   updateBubbles(root);
 }
 
@@ -137,8 +142,8 @@ function sendRequest() {
   }).done(function(res) {
     if (res.success) {
         console.log("AJAX: SUCCESS");
-        relevancyTotal += res.data.relevancy.total;
-        createCircle(res.data.query, 1, res.data.relevancy.keyword);
+        relevancyTotal += res.data.relevancy;
+        createCircle(res.data.query, 1, res.data.relevancy);
     }
     else {
         console.log("AJAX: ERROR");
