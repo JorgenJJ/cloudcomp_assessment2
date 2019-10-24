@@ -30,9 +30,9 @@ let svg = d3.select("#bubble-chart")
 function updateBubbles(root) {
   if (root.children.length > 1) {
     for(let i = 0; i < root.children.length; i++) {
-      root.children[i].size = Math.floor(((root.children[i].relevancy) / relevancyTotal) * 100);
+      root.children[i].size = Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100;
 
-      console.log(root.children[i].name + ": " + Math.floor(((root.children[i].relevancy) / relevancyTotal) * 100) + "%");
+      console.log(root.children[i].name + ": " + Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100 + "%");
 
 
     }
@@ -68,13 +68,17 @@ function updateBubbles(root) {
   node.select("circle")
     .transition().duration(1000)
     .attr("r", function (d) {
-      return d.r;
+      if (d.r < 10) {
+        return 10;
+      }
+      else return d.r;
   })
     .style("fill", function (d, i) {
       return color(i);
   });
 
-  node.append("text")
+  nodeEnter
+    .append("text")
     .attr("dy", ".3px")
     .style("text-anchor", "middle")
     .text(function(d) {
