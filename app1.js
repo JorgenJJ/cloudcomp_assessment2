@@ -150,90 +150,86 @@ if (result) {
                  console.log(scoreTotal);
                  s = s + 'Score Total: ' + scoreTotal; 
                  res.send(s); 
-
-
        }
     else {
 
+            //Serve from Twitter API and store in cache
 
-//Serve from Twitter API and store in cache
+            let s =  '<!DOCTYPE html>' +
+            '<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' + 
+            '<body><h1>Result of searched word</h1>';
 
-let s =  '<!DOCTYPE html>' +
-'<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' + 
-'<body><h1>Result of searched word</h1>';
+            // 2. Search twitter
 
-// 2. Search twitter
+            twitter.get('search/tweets', {q: input, count: 1000, language: 'en'}, function(error, tweets, response) {
 
- twitter.get('search/tweets', {q: input, count: 1000, language: 'en'}, function(error, tweets, response) {
+            //put all the tweets into an array and then store the array in Redis   
+            var tweetArray=[];
+            for (let index = 0; index < tweets.statuses.length; index++) {
+                const tweet = tweets.statuses[index];
+                var tweetbody = {
+                    'text': tweet.text,
+                    'userScreenName': "@" + tweet.user.screen_name,
+                    'userName' : tweet.user.name,
+                    'userImage': tweet.user.profile_image_url_https,
+                    'userDescription': tweet.user.description,
+                    }
+            try {
+                if(tweet.entities.media[0].media_url_https) {
+                tweetbody['image'] = tweet.entities.media[0].media_url_https;
+                }
+            } catch(err) { }
+            tweetArray.push(tweetbody);
+            }     
+        redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweetArray}));
 
- //put all the tweets into an array and then store the array in Redis   
-    var tweetArray=[];
-    for (let index = 0; index < tweets.statuses.length; index++) {
-        const tweet = tweets.statuses[index];
-        var tweetbody = {
-          'text': tweet.text,
-          'userScreenName': "@" + tweet.user.screen_name,
-          'userName' : tweet.user.name,
-          'userImage': tweet.user.profile_image_url_https,
-          'userDescription': tweet.user.description,
-        }
-        try {
-          if(tweet.entities.media[0].media_url_https) {
-            tweetbody['image'] = tweet.entities.media[0].media_url_https;
-          }
-        } catch(err) { }
-        tweetArray.push(tweetbody);
-    }     
-redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweetArray}));
+        // store in S3
 
-// store in S3
-//const responseJSON = response.data;
-const body = JSON.stringify({source: 'S3 Bucket', tweetArray});
-const objectParams = {
-    Bucket: bucketName,
-    Key: s3Key,
-    Body: body
-};
-const uploadPromise = new AWS.S3({
-    apiVersion: '2006-03-01'
-}).putObject(objectParams).promise();
+        const body = JSON.stringify({source: 'S3 Bucket', tweetArray});
+        const objectParams = {
+            Bucket: bucketName,
+            Key: s3Key,
+            Body: body
+            };
+        const uploadPromise = new AWS.S3({
+            apiVersion: '2006-03-01'
+        }).putObject(objectParams).promise();
 
-uploadPromise.then(function (data) {
-    console.log("Successfully uploaded data to " + bucketName + "/" + s3Key);
-});
+        uploadPromise.then(function (data) {
+        console.log("Successfully uploaded data to " + bucketName + "/" + s3Key);
+        });
 
-     tweets.statuses.forEach(function(tweet) {
-         console.log("tweet: " + tweet.text);
+        tweets.statuses.forEach(function(tweet) {
+            console.log("tweet: " + tweet.text);
          
-         var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-         var result = sentiment.analyze(tweet.text);
+            var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+            var result = sentiment.analyze(tweet.text);
 
-         const { SimilarSearch } = require('node-nlp');
+            const { SimilarSearch } = require('node-nlp');
 
-         const similar = new SimilarSearch();
-         const text1 = tweet.text;
-         const text2 = input;
-         const result1 = similar.getBestSubstring(text1, text2);
+            const similar = new SimilarSearch();
+            const text1 = tweet.text;
+            const text2 = input;
+            const result1 = similar.getBestSubstring(text1, text2);
 
-         console.dir(result);
-         console.log(result1);
-         scoreTotal = scoreTotal + result.score;
+            console.dir(result);
+            console.log(result1);
+            scoreTotal = scoreTotal + result.score;
     
-         s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank" title="' + tweet.user.name + '"><img class="media-object" src="' + tweet.user.profile_image_url_https + '" alt="' + tweet.user.name + '" /></a></div><div class="media-body">';
-         s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank">' + tweet.user.screen_name + '</a></h5>';
-         s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.user.screen_name + '/status/' + tweet.id_str + '">' + tweet.text + '</p>';
-         s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
-         return s;
+            s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank" title="' + tweet.user.name + '"><img class="media-object" src="' + tweet.user.profile_image_url_https + '" alt="' + tweet.user.name + '" /></a></div><div class="media-body">';
+            s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank">' + tweet.user.screen_name + '</a></h5>';
+            s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.user.screen_name + '/status/' + tweet.id_str + '">' + tweet.text + '</p>';
+            s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
+            return s;
      
-    });
-     console.log(scoreTotal);
-     s = s + 'Score Total: ' + scoreTotal; 
-     res.send(s); 
-  });
-}
-});
-  //else bracket
+            });
+            console.log(scoreTotal);
+            s = s + 'Score Total: ' + scoreTotal; 
+            res.send(s); 
+            });
         }
+        });
+    }
     });
 });
 
