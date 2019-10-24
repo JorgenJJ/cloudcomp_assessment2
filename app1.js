@@ -7,20 +7,11 @@ const router = express.Router();
 var Twitter = require('twitter');
 var Sentiment = require('sentiment');
 var d3 = require("d3");
-//var handlebars = require("express-handlebars");
 var bodyParser = require('body-parser');
 const helmet = require('helmet');
 const redis = require('redis');
 const app = express();
 const AWS = require('aws-sdk');
-
-//var server = require('http').Server(express);
-//var io = require('socket.io')(server);
-
-//TWEETS_TO_KEEP = 20;
-
-
-
 
 
 app.use(bodyParser.urlencoded({ extended: false }))
@@ -71,21 +62,13 @@ app.get('/', (req, res) => {
 });
 
 
-
 app.post('/', (req, res) => {
 
 // 1. Get user input
 const input = req.body.search_field;
 console.log(input);
 const redisKey = `twitter:${input}`;
-
-//app.get('/api/search', (req, res) => {
-  //  const query = (req.query.query).trim();
-
-    // Construct the wiki URL and key
-  //  const searchUrl = `https://en.wikipedia.org/w/api.php?action=parse&format=json&section=0&page=${query}`;
-  //  const redisKey = `twitter:${input}`; // Try the cache
-    const s3Key = `twitter-${input}`;
+const s3Key = `twitter-${input}`;
     const params = {
         Bucket: bucketName,
         Key: s3Key
@@ -98,8 +81,37 @@ return redisClient.get(redisKey, (err, result) => {
 if (result) {
     //Serve from Cache
     const resultJSON = JSON.parse(result);
-    return res.status(200).json(resultJSON);
-    
+    //console.log(resultJSON);
+    let s =  '<!DOCTYPE html>' +
+'<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' + 
+'<body><h1>Result of searched word from Redis</h1>';
+  
+  
+  resultJSON.tweetArray.forEach(function(tweet) {
+        var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+         var result = sentiment.analyze(resultJSON.tweetArray.text);
+
+         const { SimilarSearch } = require('node-nlp');
+
+         const similar = new SimilarSearch();
+         const text1 = tweet.text;
+         const text2 = input;
+         const result1 = similar.getBestSubstring(text1, text2);
+
+         console.dir(result);
+         console.log(result1);
+         scoreTotal = scoreTotal + result.score;
+
+         s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank" title="' + tweet.userName + '"><img class="media-object" src="' + tweet.userImage + '" alt="' + tweet.userName + '" /></a></div><div class="media-body">';
+         s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank">' + tweet.screen_name + '</a></h5>';
+         s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.userScreenName + '/status/">' + tweet.text + '</p></div></div>'
+         s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
+        
+        });
+        console.log(scoreTotal);
+        s = s + 'Score Total: ' + scoreTotal; 
+        res.send(s); 
+   
 } else {
     // check s3 for data
     return new AWS.S3({
@@ -109,14 +121,39 @@ if (result) {
             // Serve from S3
             console.log(result);
             const resultJSON = JSON.parse(result.Body);
-        //    delete resultJSON.source;
-        //    redisClient.setex(redisKey, 3600, JSON.stringify({
-        //        source: 'Redis Cache',
-        //        ...resultJSON,
-        //    }));
-            return res.status(200).json({source: 'S3 Bucket', ...resultJSON});
+        
+         let s =  '<!DOCTYPE html>' +
+         '<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' + 
+         '<body><h1>Result of searched word from S3</h1>';
+           
+           resultJSON.tweetArray.forEach(function(tweet) {
+                  var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+                  var result = sentiment.analyze(resultJSON.tweetArray.text);
+         
+                  const { SimilarSearch } = require('node-nlp');
+         
+                  const similar = new SimilarSearch();
+                  const text1 = tweet.text;
+                  const text2 = input;
+                  const result1 = similar.getBestSubstring(text1, text2);
+         
+                  console.dir(result);
+                  console.log(result1);
+                  scoreTotal = scoreTotal + result.score;
+         
+                  s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank" title="' + tweet.userName + '"><img class="media-object" src="' + tweet.userImage + '" alt="' + tweet.userName + '" /></a></div><div class="media-body">';
+                  s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank">' + tweet.screen_name + '</a></h5>';
+                  s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.userScreenName + '/status/">' + tweet.text + '</p></div></div>'
+                  s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
+                 
+                 });
+                 console.log(scoreTotal);
+                 s = s + 'Score Total: ' + scoreTotal; 
+                 res.send(s); 
+
+
        }
-    else{
+    else {
 
 
 //Serve from Twitter API and store in cache
@@ -167,8 +204,7 @@ uploadPromise.then(function (data) {
 
      tweets.statuses.forEach(function(tweet) {
          console.log("tweet: " + tweet.text);
-         //redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweet: tweet.id_str, tweet: tweet.user.screen_name, tweet: tweet.user.name, tweet: tweet.text}));
-        
+         
          var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
          var result = sentiment.analyze(tweet.text);
 
