@@ -9,10 +9,11 @@ const helmet = require('helmet');
 const redis = require('redis');
 const AWS = require('aws-sdk');
 var express = require('express');
+const async = require("async");
 
 var router = express.Router();
 
-const bucketName = 'assignment2-twitter-store';
+const bucketName = 'assigmment2-twitter-store';
 
 const bucketPromise = new AWS.S3({ apiVersion: '2006-03-01'}).createBucket({ Bucket: bucketName}).promise();
 bucketPromise.then(function(data) {
@@ -46,6 +47,7 @@ router.post("/api/twitter", function(req, res, next) {
   // 1. Get user input
   const input = req.body.query;
   const redisKey = `twitter:${input}`;
+  scoreTotal = 0;
 
   //app.get('/api/search', (req, res) => {
     //  const query = (req.query.query).trim();
@@ -66,7 +68,7 @@ router.post("/api/twitter", function(req, res, next) {
     if (result) {
         //Serve from Cache
         const resultJSON = JSON.parse(result);
-        // console.log(resultJSON.score);
+        console.log("Data collected from Redis cache");
         res.json({ success: true, data: {query: input, array: resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds } });
 
     } else {
@@ -76,7 +78,7 @@ router.post("/api/twitter", function(req, res, next) {
       }).getObject(params, (err, result) => {
         if (result) { // S3 has the twitter page
           // Serve from S3
-          console.log(result);
+          //console.log(result);
           const resultJSON = JSON.parse(result.Body);
       //    delete resultJSON.source;
       //    redisClient.setex(redisKey, 3600, JSON.stringify({
@@ -84,6 +86,8 @@ router.post("/api/twitter", function(req, res, next) {
       //        ...resultJSON,
       //    }));
           //return res.status(200).json({source: 'S3 Bucket', ...resultJSON});
+          console.log("Data collected from S3 storage");
+          // redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds}));
           res.json({ success: true, data: {query: input, array: resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds } });
         } else {
 
@@ -95,7 +99,7 @@ router.post("/api/twitter", function(req, res, next) {
 
           // 2. Search twitter
 
-           twitter.get('search/tweets', {q: input, count: 15, lang: 'en', result_type: 'recent'}, function(error, tweets, response) {
+           twitter.get('search/tweets', {q: input, count: 50, lang: 'en', result_type: 'recent'}, function(error, tweets, response) {
 
          //put all the tweets into an array and then store the array in Redis
            var tweetArray=[];
@@ -164,6 +168,7 @@ router.post("/api/twitter", function(req, res, next) {
             });
 
             s = s + 'Score Total: ' + scoreTotal;
+            console.log("Data collected from Twitter API");
             res.json({ success: true, data: {query: input, array: tweetArray, score: scoreTotal, relevancy: relevancy, seconds: seconds } });
           });
         }
@@ -171,6 +176,94 @@ router.post("/api/twitter", function(req, res, next) {
   //else bracket
     }
   });
+});
+
+router.get("/api/twitterAll", function(req, res, next) {
+  let bubbles = [];
+  let resultJSON;
+
+  return redisClient.keys("*", (err, result) => {
+    if (result.length != 0) {
+      //res.json({success: true, data: result});
+      async.map(result, function (key, cb) {
+        redisClient.get(key, function (error, value) {
+          if (error) return cb(error);
+          let bubble = {};
+          bubble["id"] = key;
+          bubble["data"] = value;
+          cb(null, bubble);
+        });
+      }, function (error, results) {
+        if (error) return console.log(error);
+        bubbles = results;
+        res.json({success: true, source: "REDIS", data: bubbles});
+      })
+    }
+    else {
+      const s3Key = `twitter-`;
+      const objectParams = {
+        Bucket: bucketName,
+        MaxKeys: 1000
+      };
+
+      return new AWS.S3({
+          apiVersion: '2006-03-01'
+      }).listObjects(objectParams, (err, data) => {
+        if (err) {
+          console.log(err);
+          res.json({success: true, data: bubbles});
+        }
+        else {
+          async.map(data.Contents, function (key, cb) {
+            const params = {
+              Bucket: bucketName,
+              Key: key.Key
+            }
+            const responsePromise = new AWS.S3({
+              apiVersion: '2006-03-01'
+            }).getObject(params).promise();
+
+            responsePromise.then(function (resp) {
+              let bubble = {};
+              let resJSON = JSON.parse(resp.Body);
+              bubble["id"] = params.Key;
+              bubble["data"] = resJSON;
+              cb(null, bubble);
+            });
+          }, function (error, results) {
+            if (error) return console.log(error);
+            bubbles = results;
+            res.json({success: true, source: "S3", data: bubbles});
+          });
+        }
+      });
+
+      res.json({success: true, source: null, data: null});
+    }
+  });
+});
+
+router.post("/api/delete", function (req, res, next) {
+  const input = req.body.query;
+  redisClient.del(input);
+
+  let s3name = input.split(":");
+
+  const s3Key = `twitter-${s3name[1]}`;
+  const objectParams = {
+    Bucket: bucketName,
+    Key: s3Key
+  };
+  const uploadPromise = new AWS.S3({
+    apiVersion: '2006-03-01'
+  }).deleteObject(objectParams).promise();
+
+  uploadPromise.then(function (data) {
+    console.log("Successfully deleted " + s3Key + " from " + bucketName);
+  });
+
+
+  res.json({success: true});
 });
 
 module.exports = router;

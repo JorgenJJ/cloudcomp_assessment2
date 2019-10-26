@@ -1,8 +1,7 @@
 let root = {"children": []};
 let index = 0,
     format = d3.format(",d"),
-    totalTweets = 15,
-    prevScore = 0;
+    totalTweets = 15;
 
 const width = 600,
       height = 400;
@@ -33,7 +32,6 @@ function updateBubbles(root) {
   if (root.children.length > 1) {
     for(let i = 0; i < root.children.length; i++) {
       root.children[i].size = Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100;
-      console.log(prevScore);
       console.log(root.children[i].name + ": " + root.children[i].score);
       //console.log(root.children[i].name + ": " + Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100 + "%");
 
@@ -63,8 +61,16 @@ function updateBubbles(root) {
     .attr("onclick", function (d) {return "selectCircle(" + d.index + ")"})
     .style("fill", function (d, i) {
       console.log(d.className + ": " + d.score);
-      if (d.score < 0) return "rgb(255, " + (255 + ((d.score / 10) * 255)) + ", " + (255 + ((d.score / 10) * 255)) + ")";
-      else return "rgb(" + (255 - ((d.score / 100) * 255)) + ", 255, " + (255 - ((d.score / 100) * 255)) + ")"
+      if (d.score < 0) {
+        let n = 255 + ((d.score / 50) * 255);
+        if (n > 200) n = 200;
+        return "rgb(255, " + n + ", " + n + ")";
+      }
+      else {
+        let n = 255 - ((d.score / 50) * 255);
+        if (n > 200) n = 200;
+        return "rgb(" + n + ", 255, " + n + ")";
+      }
     })
 
   // re-use enter selection for titles
@@ -234,6 +240,19 @@ function deleteCircle(circle) {
   for (let i = 0; i < root.children.length; i++) {
     if (root.children[i].index == circle) root.children.splice(i, 1);
   }
+
+  $.ajax({
+    url: '/api/delete',
+    method: 'post',
+    data: { query: "twitter:" + circleName }
+  }).done(function(res) {
+    if (res.success) {
+      console.log("AJAX: SUCCESS");
+    }
+    else {
+      console.log("AJAX: ERROR");
+    }
+  });
   // root.children.splice(circle, 1);
   updateBubbles(root);
 }
@@ -246,16 +265,46 @@ function sendRequest() {
       data: { query: document.getElementById("inp_search").value }
     }).done(function(res) {
       if (res.success) {
-          relevancyTotal += res.data.relevancy;
-          createCircle(res.data.query, res.data.array, 1, res.data.score - prevScore, res.data.relevancy, res.data.seconds);
-          prevScore = res.data.score;
+        console.log("AJAX: SUCCESS");
+        relevancyTotal += res.data.relevancy;
+        createCircle(res.data.query, res.data.array, 1, res.data.score, res.data.relevancy, res.data.seconds);
       }
       else {
-          console.log("AJAX: ERROR");
-        }
+        console.log("AJAX: ERROR");
+      }
     });
   }
 }
+
+function getAllCircles() {
+  $.ajax({
+    url: "/api/twitterAll",
+    method: "get"
+  }).done(function(res) {
+    if (res.success) {
+      console.log("AJAX: SUCCESS");
+      console.log(res.data);
+      for (let i = 0; i < res.data.length; i++) {
+        if (res.source == "REDIS") {
+          let resultJSON = JSON.parse(res.data[i].data);
+          let name = res.data[i].id.split(":");
+          relevancyTotal += resultJSON.relevancy;
+          createCircle(name[1], resultJSON.tweetArray, 1, resultJSON.score, resultJSON.relevancy, resultJSON.seconds);
+        }
+        else if (res.source == "S3") {
+          let name = res.data[i].id.split("-");
+          relevancyTotal += res.data[i].data.relevancy;
+          createCircle(name[1], res.data[i].data.tweetArray, 1, res.data[i].data.score, res.data[i].data.relevancy, res.data[i].data.seconds);
+        }
+      }
+    }
+    else {
+      console.log("AJAX: ERROR");
+    }
+  });
+}
+
+getAllCircles();
 
 // let counter;
 // counter = setInterval(function() {
