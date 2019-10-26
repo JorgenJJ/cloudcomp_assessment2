@@ -67,7 +67,7 @@ router.post("/api/twitter", function(req, res, next) {
         //Serve from Cache
         const resultJSON = JSON.parse(result);
         // console.log(resultJSON.score);
-        res.json({ success: true, data: {query: input, length: resultJSON.tweetArray.length, score: resultJSON.score, relevancy: resultJSON.relevancy } });
+        res.json({ success: true, data: {query: input, array: resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds } });
 
     } else {
       // check s3 for data
@@ -84,7 +84,7 @@ router.post("/api/twitter", function(req, res, next) {
       //        ...resultJSON,
       //    }));
           //return res.status(200).json({source: 'S3 Bucket', ...resultJSON});
-          res.json({ success: true, data: {query: input, length: resultJSON.tweetArray.length, score: resultJSON.score, relevancy: resultJSON.relevancy } });
+          res.json({ success: true, data: {query: input, array: resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds } });
         } else {
 
           //Serve from Twitter API and store in cache
@@ -120,6 +120,7 @@ router.post("/api/twitter", function(req, res, next) {
             let d1 = new Date(tweetArray[0].date);
             let d2 = new Date(tweetArray[tweetArray.length - 1].date);
             let relevancy = 1 / (Math.abs(d1 - d2));
+            let seconds = Math.abs(d1 - d2) / 1000;
 
             tweets.statuses.forEach(function(tweet) {
              //redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweet: tweet.id_str, tweet: tweet.user.screen_name, tweet: tweet.user.name, tweet: tweet.text}));
@@ -144,11 +145,11 @@ router.post("/api/twitter", function(req, res, next) {
 
             });
 
-            redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweetArray, score: scoreTotal, relevancy: relevancy}));
+            redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweetArray, score: scoreTotal, relevancy: relevancy, seconds: seconds}));
 
             // store in S3
             //const responseJSON = response.data;
-            const body = JSON.stringify({source: 'S3 Bucket', tweetArray, score: scoreTotal, relevancy: relevancy});
+            const body = JSON.stringify({source: 'S3 Bucket', tweetArray, score: scoreTotal, relevancy: relevancy, seconds: seconds});
             const objectParams = {
               Bucket: bucketName,
               Key: s3Key,
@@ -163,7 +164,7 @@ router.post("/api/twitter", function(req, res, next) {
             });
 
             s = s + 'Score Total: ' + scoreTotal;
-            res.json({ success: true, data: {query: input, length: tweetArray.length, score: scoreTotal, relevancy: relevancy } });
+            res.json({ success: true, data: {query: input, array: tweetArray, score: scoreTotal, relevancy: relevancy, seconds: seconds } });
           });
         }
       });

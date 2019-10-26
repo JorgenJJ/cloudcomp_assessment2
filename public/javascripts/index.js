@@ -1,6 +1,8 @@
 let root = {"children": []};
 let index = 0,
-    format = d3.format(",d");
+    format = d3.format(",d"),
+    totalTweets = 15,
+    prevScore = 0;
 
 const width = 600,
       height = 400;
@@ -16,10 +18,10 @@ var color = d3.scale.ordinal()
     .domain(["Sqoop", "Pig", "Apache", "a", "b", "c", "d", "e", "f", "g"])
     .range(["steelblue", "pink", "lightgreen", "violet", "orangered", "green", "orange", "skyblue", "gray", "aqua"]);
 
-    var bubble = d3.layout.pack()
-        .sort(null)
-        .size([height, height])
-        .padding(5);
+var bubble = d3.layout.pack()
+    .sort(null)
+    .size([height, height])
+    .padding(5);
 
 let svg = d3.select("#bubble-chart")
   .append("svg")
@@ -31,8 +33,9 @@ function updateBubbles(root) {
   if (root.children.length > 1) {
     for(let i = 0; i < root.children.length; i++) {
       root.children[i].size = Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100;
-
-      console.log(root.children[i].name + ": " + Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100 + "%");
+      console.log(prevScore);
+      console.log(root.children[i].name + ": " + root.children[i].score);
+      //console.log(root.children[i].name + ": " + Math.round((root.children[i].relevancy / relevancyTotal) * 10000) / 100 + "%");
 
 
     }
@@ -56,7 +59,12 @@ function updateBubbles(root) {
   nodeEnter
     .append("circle")
     .attr("r", function (d) {return d.r;})
-    .style("fill", function (d, i) {return color(i);})
+    .attr("id", function (d) {return "circle_" + d.index})
+    .attr("onclick", function (d) {return "selectCircle(" + d.index + ")"})
+    .style("fill", function (d, i) {
+      if (d.score < 0) return "rgb(255, " + ((255 + d.score) * -1) + ", " + ((255 + d.score) * -1) + ")";
+      else return "rgb(" + (255 - d.score) + ", 255, " + (255 - d.score) + ")"
+    })
 
   // re-use enter selection for titles
   nodeEnter
@@ -72,20 +80,16 @@ function updateBubbles(root) {
         return 10;
       }
       else return d.r;
-  })
-    .style("fill", function (d, i) {
-      return color(i);
   });
 
   nodeEnter
     .append("text")
     .attr("dy", ".3px")
+    .attr("onclick", function (d) {return "selectCircle(" + d.index + ")"})
     .style("text-anchor", "middle")
     .text(function(d) {
       return d.className;
   });
-
-  console.log(node);
 
   node.transition().attr("class", "node")
     .attr("transform", function (d) {
@@ -105,7 +109,9 @@ function updateBubbles(root) {
       else classes.push({
           packageName: name,
           className: node.name,
-          value: node.size
+          value: node.size,
+          index: node.index,
+          score: node.score
       });
     }
 
@@ -132,27 +138,124 @@ function createCircle() {
   updateBubbles(root);
 }
 
-function createCircle(name, size, relevancy) {
-  root.children.push({"name": name, "size": Number(size), "growth": 0, "relevancy": Number(relevancy) });
+function createCircle(name, array, size, score, relevancy, seconds) {
+  root.children.push({"index": index++, "name": name, "array": array, "size": Number(size), "score": Number(score), "relevancy": Number(relevancy), "seconds": Number(seconds) });
   document.getElementById("inp_search").value = "";
   updateBubbles(root);
 }
 
-function sendRequest() {
-  $.ajax({
-    url: '/api/twitter',
-    method: 'post',
-    data: { query: document.getElementById("inp_search").value }
-  }).done(function(res) {
-    if (res.success) {
-        console.log("AJAX: SUCCESS");
-        relevancyTotal += res.data.relevancy;
-        createCircle(res.data.query, 1, res.data.relevancy);
-    }
-    else {
-        console.log("AJAX: ERROR");
+function selectCircle(circle) {
+  let body = document.getElementById("information");
+  if (body.childNodes.length != 0) body.removeChild(body.childNodes[0]);
+
+  let circleElement = document.getElementById("circle_" + circle);
+  let circleName = circleElement.nextSibling.nextSibling.innerHTML;
+
+  let c;
+  for (let i = 0; i < root.children.length; i++) {
+    if (root.children[i].name == circleName) c = root.children[i];
+  }
+
+  let div = document.createElement("div");
+  div.setAttribute("id", "div_information");
+
+  let title = document.createElement("h1");
+  title.innerHTML = circleName;
+
+  let pm = (Math.round(1 / (c.seconds / totalTweets) * 100) / 100);
+  let tpm = document.createElement("h3");
+  if ( 1 / (c.seconds / totalTweets) > (1 / 60)) tpm.innerHTML = "Tweets per second: " + pm;
+  else tpm.innerHTML = "Tweets per second: Less than one an minute";
+
+  //tpm.innerHTML = "Time between first and last tweet: " + Math.floor(c.seconds / 60) + ":" + (c.seconds % 60);
+
+  let del;
+  if (root.children.length > 1) {
+    del = document.createElement("input");
+    del.setAttribute("id", "btn_deleteCircle");
+    del.setAttribute("type", "button");
+    del.setAttribute("value", "Remove circle");
+    del.setAttribute("onclick", "deleteCircle(" + circle + ")");
+  }
+
+  let tweets = document.createElement("div");
+  tweets.setAttribute("class", "div_tweet_list");
+
+  for (let j = 0; j < root.children.length; j++) {
+    if (root.children[j].index == circle) {
+      for (let i = 0; i < root.children[j].array.length; i++) {
+        let tweet = document.createElement("div");
+        tweet.setAttribute("class", "div_tweet");
+
+        // let img = document.createElement("img");
+        // img.setAttribute("class", "profile_picture");
+        // img.setAttribute("src", root.children[circle].array[i].userImage);
+
+        let u = document.createElement("h3");
+        u.setAttribute("class", "profile_name");
+        u.innerHTML = root.children[j].array[i].userName;
+
+        let d = document.createElement("p");
+        d.setAttribute("class", "tweet_date");
+        d.innerHTML = root.children[j].array[i].date;
+
+        let t = document.createElement("p");
+        t.setAttribute("class", "tweet_text");
+        t.innerHTML = root.children[j].array[i].text;
+
+        // tweet.append(img);
+        tweet.append(u);
+        tweet.append(d);
+        tweet.append(t);
+        tweets.append(tweet);
       }
-  });
+    }
+  }
+
+  div.append(title);
+  div.append(tpm);
+  if (root.children.length > 1) div.append(del);
+  div.append(tweets);
+  document.getElementById("information").append(div);
+}
+
+function deleteCircle(circle) {
+  let circleElement = document.getElementById("circle_" + circle);
+  let circleName = circleElement.nextSibling.nextSibling.innerHTML;
+
+  let c;
+  for (let i = 0; i < root.children.length; i++) {
+    if (root.children[i].name == circleName) c = root.children[i];
+  }
+
+  let body = document.getElementById("information");
+  if (body.childNodes.length != 0) body.removeChild(body.childNodes[0]);
+  for (let i = 0; i < root.children.length; i++) {
+    if (root.children[i].index == circle) root.children.splice(i, 1);
+  }
+  // root.children.splice(circle, 1);
+  updateBubbles(root);
+}
+
+function sendRequest() {
+  if (document.getElementById("inp_search").value != "") {
+    $.ajax({
+      url: '/api/twitter',
+      method: 'post',
+      data: { query: document.getElementById("inp_search").value }
+    }).done(function(res) {
+      if (res.success) {
+          console.log("AJAX: SUCCESS");
+          console.log(prevScore + res.data.score);
+          relevancyTotal += res.data.relevancy;
+          createCircle(res.data.query, res.data.array, 1, res.data.score - prevScore, res.data.relevancy, res.data.seconds);
+          prevScore = res.data.score;
+      }
+      else {
+          console.log("AJAX: ERROR");
+        }
+    });
+  }
 }
 
 // let counter;
