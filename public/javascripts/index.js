@@ -62,8 +62,9 @@ function updateBubbles(root) {
     .attr("id", function (d) {return "circle_" + d.index})
     .attr("onclick", function (d) {return "selectCircle(" + d.index + ")"})
     .style("fill", function (d, i) {
-      if (d.score < 0) return "rgb(255, " + ((255 + d.score) * -1) + ", " + ((255 + d.score) * -1) + ")";
-      else return "rgb(" + (255 - d.score) + ", 255, " + (255 - d.score) + ")"
+      console.log(d.className + ": " + d.score);
+      if (d.score < 0) return "rgb(255, " + (255 + ((d.score / 10) * 255)) + ", " + (255 + ((d.score / 10) * 255)) + ")";
+      else return "rgb(" + (255 - ((d.score / 100) * 255)) + ", 255, " + (255 - ((d.score / 100) * 255)) + ")"
     })
 
   // re-use enter selection for titles
@@ -245,8 +246,6 @@ function sendRequest() {
       data: { query: document.getElementById("inp_search").value }
     }).done(function(res) {
       if (res.success) {
-          console.log("AJAX: SUCCESS");
-          console.log(prevScore + res.data.score);
           relevancyTotal += res.data.relevancy;
           createCircle(res.data.query, res.data.array, 1, res.data.score - prevScore, res.data.relevancy, res.data.seconds);
           prevScore = res.data.score;
