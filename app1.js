@@ -32,7 +32,7 @@ var scoreTotal = 0;
 
 //  Cloud Services Set-up   
 //  Create unique bucket name
-const bucketName = 'assignment2-twitter-store'; 
+const bucketName = 'assign2-twitter-store'; 
 //  Create a promise on S3  service object
 const bucketPromise = new AWS.S3({ apiVersion: '2006-03-01'}).createBucket({ Bucket: bucketName}).promise();
 bucketPromise.then(function(data) {
@@ -82,14 +82,16 @@ if (result) {
     //Serve from Cache
     const resultJSON = JSON.parse(result);
     //console.log(resultJSON);
+   // return res.status(200).json(resultJSON);
     let s =  '<!DOCTYPE html>' +
-'<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' + 
-'<body><h1>Result of searched word from Redis</h1>';
-  
-  
+                '<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' + 
+                '<body><h1>Result of searched word from Redis</h1>';
+
+var scoreTotal = 0;
   resultJSON.tweetArray.forEach(function(tweet) {
         var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-         var result = sentiment.analyze(resultJSON.tweetArray.text);
+        // var result = sentiment.analyze(resultJSON.tweetArray.tweet.text);
+        var result = sentiment.analyze(tweet.text);
 
          const { SimilarSearch } = require('node-nlp');
 
@@ -103,10 +105,12 @@ if (result) {
          scoreTotal = scoreTotal + result.score;
 
          s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank" title="' + tweet.userName + '"><img class="media-object" src="' + tweet.userImage + '" alt="' + tweet.userName + '" /></a></div><div class="media-body">';
-         s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank">' + tweet.screen_name + '</a></h5>';
-         s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.userScreenName + '/status/">' + tweet.text + '</p></div></div>'
-         s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
-        
+         s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank">' + tweet.userScreenName + '</a></h5>';
+         s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.userScreenName + '/status/' + tweet.userID + '">' + tweet.text + '</p>';
+         s += 'Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
+
+         return s;
+
         });
         console.log(scoreTotal);
         s = s + 'Score Total: ' + scoreTotal; 
@@ -114,6 +118,7 @@ if (result) {
    
 } else {
     // check s3 for data
+    var scoreTotal = 0;
     return new AWS.S3({
         apiVersion: '2006-03-01'
     }).getObject(params, (err, result) => {
@@ -128,8 +133,8 @@ if (result) {
            
            resultJSON.tweetArray.forEach(function(tweet) {
                   var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-                  var result = sentiment.analyze(resultJSON.tweetArray.text);
-         
+                //  var result = sentiment.analyze(resultJSON.tweetArray.text);
+                var result = sentiment.analyze(tweet.text);
                   const { SimilarSearch } = require('node-nlp');
          
                   const similar = new SimilarSearch();
@@ -142,8 +147,8 @@ if (result) {
                   scoreTotal = scoreTotal + result.score;
          
                   s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank" title="' + tweet.userName + '"><img class="media-object" src="' + tweet.userImage + '" alt="' + tweet.userName + '" /></a></div><div class="media-body">';
-                  s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank">' + tweet.screen_name + '</a></h5>';
-                  s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.userScreenName + '/status/">' + tweet.text + '</p></div></div>'
+                  s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.userScreenName + '" target="_blank">' + tweet.userScreenName + '</a></h5>';
+                  s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.userScreenName + '/status/' + tweet.userID + '">' + tweet.text + '</p></div></div>';
                   s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
                  
                  });
@@ -170,9 +175,11 @@ if (result) {
                 var tweetbody = {
                     'text': tweet.text,
                     'userScreenName': "@" + tweet.user.screen_name,
+                  //  'userScreenName': tweet.user.screen_name,
                     'userName' : tweet.user.name,
                     'userImage': tweet.user.profile_image_url_https,
                     'userDescription': tweet.user.description,
+                    'userID' : tweet.id_str,
                     }
             try {
                 if(tweet.entities.media[0].media_url_https) {
@@ -199,7 +206,7 @@ if (result) {
         console.log("Successfully uploaded data to " + bucketName + "/" + s3Key);
         });
 
-        tweets.statuses.forEach(function(tweet) {
+       tweets.statuses.forEach(function(tweet) {
             console.log("tweet: " + tweet.text);
          
             var sentiment = new Sentiment();                                                                                                                                                                                                                                                                                                                                                                                                                                                             
@@ -219,7 +226,7 @@ if (result) {
             s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank" title="' + tweet.user.name + '"><img class="media-object" src="' + tweet.user.profile_image_url_https + '" alt="' + tweet.user.name + '" /></a></div><div class="media-body">';
             s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank">' + tweet.user.screen_name + '</a></h5>';
             s += '<p class="tweet-body" title="View full tweet" data-link="https://twitter.com/' + tweet.user.screen_name + '/status/' + tweet.id_str + '">' + tweet.text + '</p>';
-            s += ' </div></div> Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
+            s += 'Score: ' + result.score + ' Accumulated score: ' + scoreTotal + ' Result on simularity: accuracy ' + result1.accuracy + ', The Levenshtein distance '+ result1.levenshtein + '</div></div>'
             return s;
      
             });
