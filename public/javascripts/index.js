@@ -1,7 +1,7 @@
 let root = {"children": []};
 let index = 0,
     format = d3.format(",d"),
-    totalTweets = 15;
+    totalTweets = 50;
 
 const width = 600,
       height = 400;
@@ -171,7 +171,8 @@ function selectCircle(circle) {
 
   let pm = (Math.round(1 / (c.seconds / totalTweets) * 100) / 100);
   let tpm = document.createElement("h3");
-  if ( 1 / (c.seconds / totalTweets) > (1 / 60)) tpm.innerHTML = "Tweets per second: " + pm;
+  if (c.seconds == 0) tpm.innerHTML = "More than " + totalTweets + " per second";
+  else if ( 1 / (c.seconds / totalTweets) > (1 / 60)) tpm.innerHTML = "Tweets per second: " + pm;
   else tpm.innerHTML = "Tweets per second: Less than one an minute";
 
   //tpm.innerHTML = "Time between first and last tweet: " + Math.floor(c.seconds / 60) + ":" + (c.seconds % 60);
@@ -304,7 +305,7 @@ function getAllCircles() {
   });
 }
 
-getAllCircles();
+// getAllCircles();
 
 // let counter;
 // counter = setInterval(function() {
