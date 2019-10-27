@@ -2,11 +2,28 @@ html, body {
   margin: 10px;
   padding: 0;
   font-family: sans-serif;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
 }
 
 #controls {
   font-size: 18px;
   margin-bottom: 10px;
+  grid-column: 1/2;
+  grid-row: 1/2;
+}
+
+#bubble-chart {
+  grid-column: 1/2;
+  grid-row: 2/3;
+}
+
+#information {
+  margin-left: 10px;
+  grid-column: 2/3;
+  grid-row: 2/3;
+  width: 100%;
 }
 
 input[type="radio"] {
@@ -16,14 +33,6 @@ input[type="radio"] {
 
 span:nth-child(2) {
   margin-left: 20px;
-}
-
-#country-info {
-  color: #666;
-  font-size: 28px;
-  position: absolute;
-  top: 60px;
-  left: 40px;
 }
 
 svg {
@@ -37,4 +46,42 @@ circle {
 
 .continent-key-element text {
   fill: white;
+}
+
+.div_tweet_list {
+  overflow: auto;
+  height: 500px;
+  padding: 4px;
+  border: 2px solid black;
+}
+
+.div_tweet {
+  border: 1px solid black;
+  margin-bottom: 5px;
+  background-color: #f7f7f7;
+
+  display: grid;
+  grid-template-rows: auto auto auto;
+}
+
+.profile_picture {
+  grid-row: 1/2;
+  margin-top: 5px;
+  margin-left: 5px;
+}
+
+.profile_name {
+  grid-row: 1/2;
+  margin: 5px;
+}
+
+.tweet_date {
+  grid-row: 2/3;
+  margin: 5px;
+}
+
+.tweet_text {
+  grid-row: 3/4;
+  font-size: 14px;
+  margin: 5px;
 }
