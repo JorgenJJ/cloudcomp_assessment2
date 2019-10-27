@@ -86,7 +86,7 @@ router.post("/api/twitter", function(req, res, next) {
 
           // 2. Search twitter
 
-           twitter.get('search/tweets', {q: input, count: 50, lang: 'en', result_type: 'recent'}, function(error, tweets, response) {
+           twitter.get('search/tweets', {q: input, count: 100, lang: 'en', result_type: 'recent'}, function(error, tweets, response) {
 
          //put all the tweets into an array and then store the array in Redis
            var tweetArray=[];

@@ -1,6 +1,6 @@
 let root = {"children": []};
 let index = 0,  // Used to select specific bubbles from the charts
-    totalTweets = 50; // The amount of tweets fetched using the API
+    totalTweets = 100; // The amount of tweets fetched using the API
 
 // Size of the bubble chart
 const width = 600,
