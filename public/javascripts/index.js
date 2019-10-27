@@ -278,6 +278,7 @@ function sendRequest() {
   }
 }
 
+// *NOT IN USE*
 function getAllCircles() {
   $.ajax({
     url: "/api/twitterAll",

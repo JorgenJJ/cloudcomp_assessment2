@@ -13,6 +13,7 @@ const async = require("async");
 
 var router = express.Router();
 
+// Set up connection with AWS S3 bucket
 const bucketName = 'assessment2-twitter-store';
 
 const bucketPromise = new AWS.S3({ apiVersion: '2006-03-01'}).createBucket({ Bucket: bucketName}).promise();
@@ -23,12 +24,14 @@ bucketPromise.then(function(data) {
     console.error(err, err.stack);
 });
 
+// Set up connection with Redis cache
 const redisClient = redis.createClient();
 
 redisClient.on('error', (err) => {
     console.log("REDIS ERROR: " + err);
 });
 
+// Authentication for using the Twitter API
 var twitter = new Twitter({
   consumer_key: 'Z9OufPZ5l5gb17dyWnRpNOjqC',
   consumer_secret: 'Fa2fvXJ3AhTNOHUWfLIwSOdyC42IOOPXx8TdY6wuUSgr9iqIqW',
@@ -36,7 +39,7 @@ var twitter = new Twitter({
   access_token_secret: 'VGf2Ea89NwKzQyEDleGrx5hiAqYJnmx9QZqQIHK4yyUmh'
 });
 
-let scoreTotal = 0;
+let scoreTotal = 0; // Saves the total score provided by Sentiment analysis
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -44,18 +47,10 @@ router.get('/', function(req, res, next) {
 });
 
 router.post("/api/twitter", function(req, res, next) {
-  // 1. Get user input
   const input = req.body.query;
-  const redisKey = `twitter:${input}`;
+  const redisKey = `twitter:${input}`;  // Redis key format
   scoreTotal = 0;
-
-  //app.get('/api/search', (req, res) => {
-    //  const query = (req.query.query).trim();
-
-      // Construct the wiki URL and key
-    //  const searchUrl = `https://en.wikipedia.org/w/api.php?action=parse&format=json&section=0&page=${query}`;
-    //  const redisKey = `twitter:${input}`; // Try the cache
-  const s3Key = `twitter-${input}`;
+  const s3Key = `twitter-${input}`; // S3 key format
   const params = {
       Bucket: bucketName,
       Key: s3Key
@@ -65,34 +60,26 @@ router.post("/api/twitter", function(req, res, next) {
   //Try the cache
   return redisClient.get(redisKey, (err, result) => {
 
-    if (result) {
+    if (result) { // If found in redis
         //Serve from Cache
         const resultJSON = JSON.parse(result);
         console.log("Data collected from Redis cache");
         res.json({ success: true, data: {query: input, array: resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds } });
 
-    } else {
+    } else {  // If not found in redis
       // check s3 for data
       return new AWS.S3({
           apiVersion: '2006-03-01'
       }).getObject(params, (err, result) => {
-        if (result) { // S3 has the twitter page
+        if (result) { // If in S3
           // Serve from S3
-          //console.log(result);
           const resultJSON = JSON.parse(result.Body);
-      //    delete resultJSON.source;
-      //    redisClient.setex(redisKey, 3600, JSON.stringify({
-      //        source: 'Redis Cache',
-      //        ...resultJSON,
-      //    }));
-          //return res.status(200).json({source: 'S3 Bucket', ...resultJSON});
           console.log("Data collected from S3 storage");
-          // redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds}));
           res.json({ success: true, data: {query: input, array: resultJSON.tweetArray, score: resultJSON.score, relevancy: resultJSON.relevancy, seconds: resultJSON.seconds } });
-        } else {
+        } else {  // If not in S3
 
-          //Serve from Twitter API and store in cache
-
+          //Serve from Twitter API and store in cache and Redis
+          // All code related to s is currently not in use
           let s =  '<!DOCTYPE html>' +
           '<html><head><title>Twitter output</title><link rel="stylesheet" href="/public/css/styles.css" type="text/css"><meta charset="UTF-8"/></head>' +
           '<body><h1>Result of searched word</h1>';
@@ -103,9 +90,9 @@ router.post("/api/twitter", function(req, res, next) {
 
          //put all the tweets into an array and then store the array in Redis
            var tweetArray=[];
-            for (let index = 0; index < tweets.statuses.length; index++) {
+            for (let index = 0; index < tweets.statuses.length; index++) {  // Loop through all received tweets
               const tweet = tweets.statuses[index];
-              var tweetbody = {
+              var tweetbody = { // Create an object for each tweet
                 'text': tweet.text,
                 'userScreenName': "@" + tweet.user.screen_name,
                 'userName' : tweet.user.name,
@@ -114,7 +101,7 @@ router.post("/api/twitter", function(req, res, next) {
                 'date': tweet.created_at,
               }
               try {
-                if(tweet.entities.media[0].media_url_https) {
+                if(tweet.entities.media[0].media_url_https) { // If there is an image attached
                   tweetbody['image'] = tweet.entities.media[0].media_url_https;
                 }
               } catch(err) { };
@@ -126,11 +113,10 @@ router.post("/api/twitter", function(req, res, next) {
             let relevancy = 1 / (Math.abs(d1 - d2));
             let seconds = Math.abs(d1 - d2) / 1000;
 
-            tweets.statuses.forEach(function(tweet) {
-             //redisClient.setex(redisKey, 3600, JSON.stringify({source: 'Redis Cache', tweet: tweet.id_str, tweet: tweet.user.screen_name, tweet: tweet.user.name, tweet: tweet.text}));
+            tweets.statuses.forEach(function(tweet) { // Loop through all tweets
 
               var sentiment = new Sentiment();
-              var result = sentiment.analyze(tweet.text);
+              var result = sentiment.analyze(tweet.text); // Analyze the tweet score
 
               const { SimilarSearch } = require('node-nlp');
 
@@ -139,7 +125,7 @@ router.post("/api/twitter", function(req, res, next) {
               const text2 = input;
               const result1 = similar.getBestSubstring(text1, text2);
 
-              scoreTotal = scoreTotal + result.score;
+              scoreTotal = scoreTotal + result.score; // Add the score to the total
 
               s += '<h3>Tweet:</h3><div class="container"><div class="row"><div class="col-sm"><div class="media-left"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank" title="' + tweet.user.name + '"><img class="media-object" src="' + tweet.user.profile_image_url_https + '" alt="' + tweet.user.name + '" /></a></div><div class="media-body">';
               s += ' <h5 class="media-heading"><a href="https://twitter.com/' + tweet.user.screen_name + '" target="_blank">' + tweet.user.screen_name + '</a></h5>';
@@ -173,11 +159,12 @@ router.post("/api/twitter", function(req, res, next) {
           });
         }
       });
-  //else bracket
     }
   });
 });
 
+// Collecting all stored bubbles
+// *NOT IN USE*
 router.get("/api/twitterAll", function(req, res, next) {
   let bubbles = [];
   let resultJSON;
@@ -243,6 +230,7 @@ router.get("/api/twitterAll", function(req, res, next) {
   });
 });
 
+// Delete bubble from Redis and S3
 router.post("/api/delete", function (req, res, next) {
   const input = req.body.query;
   redisClient.del(input);
