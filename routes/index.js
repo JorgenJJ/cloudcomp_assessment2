@@ -13,7 +13,7 @@ const async = require("async");
 
 var router = express.Router();
 
-const bucketName = 'assigmment2-twitter-store';
+const bucketName = 'assessment2-twitter-store';
 
 const bucketPromise = new AWS.S3({ apiVersion: '2006-03-01'}).createBucket({ Bucket: bucketName}).promise();
 bucketPromise.then(function(data) {

@@ -77,7 +77,7 @@ function updateBubbles(root) {
   nodeEnter
     .append("title")
     .text(function (d) {
-      return d.className + ": " + d.value;
+      return d.className;
   });
 
   node.select("circle")
